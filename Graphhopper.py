@@ -90,6 +90,9 @@ class GraphHopperApp:
 
         self.build_styles()
         self.build_ui()
+        # Track whether the currently displayed route has been saved to disk.
+        # This lets us skip the "save before exit" prompt when it's unnecessary.
+        self.route_saved = False
 
     def build_styles(self):
         style = ttk.Style()
@@ -140,7 +143,7 @@ class GraphHopperApp:
         ttk.Button(button_frame, text="Get Route", command=self.get_route_gui).pack(side="left", padx=(0, 10))
         ttk.Button(button_frame, text="Clear", command=self.clear_fields).pack(side="left", padx=(0, 10))
         ttk.Button(button_frame, text="Save Route", command=self.save_route).pack(side="left", padx=(0, 10))
-        ttk.Button(button_frame, text="Exit", command=self.root.quit).pack(side="left")
+        ttk.Button(button_frame, text="Exit", command=self.confirm_next_action).pack(side="left")
 
         # Summary card
         summary_card = ttk.Frame(main, style="Card.TFrame", padding=15)
@@ -262,6 +265,34 @@ class GraphHopperApp:
             "sec": sec,
             "instructions": instructions,
         }
+        # Mark the newly displayed route as not-yet-saved
+        self.route_saved = False
+
+        # After displaying a route, prompt the user whether they want to
+        # search another route. If they answer Yes, clear the inputs so they
+        # can enter a new search. If No, leave the result displayed.
+        def _ask_search_another():
+            try:
+                search_again = messagebox.askyesno(
+                    "Search another route",
+                    "Search another route?\n\nYes = search another route\nNo = stay on this screen",
+                )
+            except Exception:
+                search_again = False
+
+            if search_again:
+                self.clear_fields()
+                try:
+                    self.start_entry.focus_set()
+                except Exception:
+                    pass
+
+        try:
+            # Schedule after a short delay to let the UI update and show the
+            # displayed route before the dialog appears.
+            self.root.after(100, _ask_search_another)
+        except Exception:
+            _ask_search_another()
 
     def set_directions_text(self, text):
         self.directions_text.config(state="normal")
@@ -310,6 +341,50 @@ class GraphHopperApp:
             messagebox.showinfo("Saved", f"Route saved to {filename}")
         except Exception as e:
             messagebox.showerror("Save Error", f"Could not save file:\n{e}")
+
+    def confirm_next_action(self):
+        """Confirm exit when the Exit button is pressed.
+
+        First ask the user to confirm exit. If they confirm and a route is
+        currently loaded, ask whether to save the route before quitting.
+        If no route is loaded, just quit immediately after confirmation.
+        """
+        try:
+            confirm_exit = messagebox.askyesno(
+                "Confirm Exit",
+                "Are you sure you want to exit?",
+            )
+        except Exception:
+            confirm_exit = False
+
+        if not confirm_exit:
+            # User cancelled exit; do nothing
+            return
+
+        # User confirmed exit. If there's a route loaded, ask if they want to save it.
+        if self.last_route_data:
+            try:
+                save_before_exit = messagebox.askyesno(
+                    "Save before exit",
+                    "A route is loaded. Do you want to save the current route before exiting?",
+                )
+            except Exception:
+                save_before_exit = False
+
+            if save_before_exit:
+                try:
+                    self.save_route()
+                except Exception:
+                    # save_route shows its own dialogs; ignore failures here
+                    pass
+
+        try:
+            self.root.quit()
+        except Exception:
+            try:
+                self.root.destroy()
+            except Exception:
+                pass
 
 
 # =========================================
