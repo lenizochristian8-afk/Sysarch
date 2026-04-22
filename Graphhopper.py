@@ -10,6 +10,9 @@ from tkinter import ttk, messagebox, scrolledtext
 ROUTE_URL = "https://graphhopper.com/api/1/route?"
 API_KEY = ("a7165d35-6383-44cd-b07d-4f6ce277403d")
 
+# Distance Converter feature.
+DISTANCE_DISPLAY_OPTIONS = ["miles only", "kilometers only", "both"]
+
 
 # =========================================
 # API FUNCTIONS
@@ -135,10 +138,20 @@ class GraphHopperApp:
         self.vehicle_combo.grid(row=3, column=1, sticky="w", pady=6)
         self.vehicle_combo.set("car")
 
+        ttk.Label(input_card, text="Distance Display:").grid(row=4, column=0, sticky="w", padx=(0, 10), pady=6)
+        self.distance_display_combo = ttk.Combobox(
+            input_card,
+            values=DISTANCE_DISPLAY_OPTIONS,
+            state="readonly",
+            width=20,
+        )
+        self.distance_display_combo.grid(row=4, column=1, sticky="w", pady=6)
+        self.distance_display_combo.set("both")
+
         input_card.columnconfigure(1, weight=1)
 
         button_frame = ttk.Frame(input_card)
-        button_frame.grid(row=4, column=0, columnspan=2, pady=(12, 0), sticky="w")
+        button_frame.grid(row=5, column=0, columnspan=2, pady=(12, 0), sticky="w")
 
         ttk.Button(button_frame, text="Get Route", command=self.get_route_gui).pack(side="left", padx=(0, 10))
         ttk.Button(button_frame, text="Clear", command=self.clear_fields).pack(side="left", padx=(0, 10))
@@ -180,6 +193,7 @@ class GraphHopperApp:
         start = self.start_entry.get().strip()
         dest = self.dest_entry.get().strip()
         vehicle = self.vehicle_combo.get().strip().lower()
+        distance_display = self.distance_display_combo.get().strip().lower()
 
         if API_KEY == "YOUR_API_KEY_HERE":
             messagebox.showwarning("Missing API Key", "Please set your GraphHopper API key first.")
@@ -195,6 +209,10 @@ class GraphHopperApp:
 
         if vehicle not in ["car", "bike", "foot"]:
             messagebox.showwarning("Input Error", "Please select a valid vehicle profile.")
+            return
+
+        if distance_display not in DISTANCE_DISPLAY_OPTIONS:
+            messagebox.showwarning("Input Error", "Please select a valid distance display option.")
             return
 
         self.summary_label.config(text="Processing route...")
@@ -221,9 +239,16 @@ class GraphHopperApp:
             self.set_directions_text("")
             return
 
-        self.display_route(orig, dest_data, vehicle, route_data)
+        self.display_route(orig, dest_data, vehicle, distance_display, route_data)
 
-    def display_route(self, orig, dest, vehicle, route_data):
+    def format_distance(self, km_value, miles_value, display_mode):
+        if display_mode == "miles only":
+            return f"{miles_value:.1f} miles"
+        if display_mode == "kilometers only":
+            return f"{km_value:.1f} km"
+        return f"{miles_value:.1f} miles / {km_value:.1f} km"
+
+    def display_route(self, orig, dest, vehicle, distance_display, route_data):
         path_info = route_data["paths"][0]
 
         miles = path_info["distance"] / 1000 / 1.61
@@ -237,7 +262,8 @@ class GraphHopperApp:
             f"Starting Location : {orig[3]}\n"
             f"Destination       : {dest[3]}\n"
             f"Vehicle Profile   : {vehicle}\n"
-            f"Distance          : {miles:.1f} miles / {km:.1f} km\n"
+            f"Distance Display  : {distance_display.title()}\n"
+            f"Distance          : {self.format_distance(km, miles, distance_display)}\n"
             f"Duration          : {hrs:02d}:{mins:02d}:{sec:02d}"
         )
         self.summary_label.config(text=summary)
@@ -249,7 +275,7 @@ class GraphHopperApp:
             step_miles = step_km / 1.61
             directions_output.append(
                 f"{i:02d}. {text}\n"
-                f"    Distance: {step_km:.1f} km / {step_miles:.1f} miles\n"
+                f"    Distance: {self.format_distance(step_km, step_miles, distance_display)}\n"
             )
 
         self.set_directions_text("\n".join(directions_output))
@@ -258,6 +284,7 @@ class GraphHopperApp:
             "origin": orig[3],
             "destination": dest[3],
             "vehicle": vehicle,
+            "distance_display": distance_display,
             "miles": miles,
             "km": km,
             "hrs": hrs,
@@ -304,6 +331,7 @@ class GraphHopperApp:
         self.start_entry.delete(0, tk.END)
         self.dest_entry.delete(0, tk.END)
         self.vehicle_combo.set("car")
+        self.distance_display_combo.set("both")
         self.summary_label.config(text="No route loaded yet.")
         self.set_directions_text("")
         self.last_route_data = None
@@ -322,7 +350,11 @@ class GraphHopperApp:
                 file.write(f"Starting Location : {self.last_route_data['origin']}\n")
                 file.write(f"Destination       : {self.last_route_data['destination']}\n")
                 file.write(f"Vehicle Profile   : {self.last_route_data['vehicle']}\n")
-                file.write(f"Distance          : {self.last_route_data['miles']:.1f} miles / {self.last_route_data['km']:.1f} km\n")
+                file.write(f"Distance Display  : {self.last_route_data['distance_display'].title()}\n")
+                file.write(
+                    f"Distance          : "
+                    f"{self.format_distance(self.last_route_data['km'], self.last_route_data['miles'], self.last_route_data['distance_display'])}\n"
+                )
                 file.write(
                     f"Duration          : {self.last_route_data['hrs']:02d}:"
                     f"{self.last_route_data['mins']:02d}:"
@@ -336,7 +368,10 @@ class GraphHopperApp:
                     distance_km = step["distance"] / 1000
                     distance_miles = distance_km / 1.61
                     file.write(f"{i:02d}. {path}\n")
-                    file.write(f"    Distance: {distance_km:.1f} km / {distance_miles:.1f} miles\n")
+                    file.write(
+                        f"    Distance: "
+                        f"{self.format_distance(distance_km, distance_miles, self.last_route_data['distance_display'])}\n"
+                    )
 
             messagebox.showinfo("Saved", f"Route saved to {filename}")
         except Exception as e:
