@@ -208,8 +208,8 @@ class GraphHopperApp:
             return
 
         if vehicle not in ["car", "bike", "foot"]:
-            messagebox.showwarning("Input Error", "Please select a valid vehicle profile.")
-            return
+            vehicle = "car"
+            self.vehicle_combo.set("car")
 
         if distance_display not in DISTANCE_DISPLAY_OPTIONS:
             messagebox.showwarning("Input Error", "Please select a valid distance display option.")
