@@ -350,7 +350,6 @@ class GraphHopperApp:
                 file.write(f"Starting Location : {self.last_route_data['origin']}\n")
                 file.write(f"Destination       : {self.last_route_data['destination']}\n")
                 file.write(f"Vehicle Profile   : {self.last_route_data['vehicle']}\n")
-                file.write(f"Distance Display  : {self.last_route_data['distance_display'].title()}\n")
                 file.write(
                     f"Distance          : "
                     f"{self.format_distance(self.last_route_data['km'], self.last_route_data['miles'], self.last_route_data['distance_display'])}\n"
@@ -360,18 +359,6 @@ class GraphHopperApp:
                     f"{self.last_route_data['mins']:02d}:"
                     f"{self.last_route_data['sec']:02d}\n"
                 )
-                file.write("\nTURN-BY-TURN DIRECTIONS\n")
-                file.write("-" * 50 + "\n")
-
-                for i, step in enumerate(self.last_route_data["instructions"], start=1):
-                    path = step["text"]
-                    distance_km = step["distance"] / 1000
-                    distance_miles = distance_km / 1.61
-                    file.write(f"{i:02d}. {path}\n")
-                    file.write(
-                        f"    Distance: "
-                        f"{self.format_distance(distance_km, distance_miles, self.last_route_data['distance_display'])}\n"
-                    )
 
             messagebox.showinfo("Saved", f"Route saved to {filename}")
         except Exception as e:
